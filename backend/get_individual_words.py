@@ -1,20 +1,29 @@
-import csv, os, sys
+import csv, os, sys, json, string
 import subprocess
 from moviepy.editor import VideoFileClip, AudioFileClip, concatenate_videoclips
 import moviepy.video.fx.all as vfx
 
+bad_words_path = 'bad-words.txt'
 csv_file_path = './transcribed/transcribed_audio.aac.words.csv'
 
-badWords = ["fuck", "bitch"]
+def read_bad_words(file_path):
+    with open(file_path, 'r') as file:
+        return [line.strip() for line in file.readlines()]
+
+def contains_bad_word(word, badWords):
+    cleaned_word = word.lower().translate(str.maketrans('','', string.punctuation))
+    return cleaned_word in [bad_word.lower() for bad_word in badWords]
+
+censor_words = json.loads(sys.argv[2])
+if censor_words:
+    badWords = censor_words
+else:
+    badWords = read_bad_words(bad_words_path)
+
 bw_found = []
 bw_start = []
 bw_end = []
 
-def contains_bad_word(word, badWords):
-    for badWord in badWords:
-        if badWord in word:
-            return True
-    return False 
 
 with open(csv_file_path, 'r') as csvfile:
     csvreader = csv.reader(csvfile)
@@ -54,7 +63,7 @@ def adjust_speed_to_duration(input_path, output_path, target_duration, name):
 
 
 for position in range(len(bw_found)-1):
-    adjust_speed_to_duration(' '.join(sys.argv[2:]), './edited_bleeps', float(bw_end[position])-float(bw_start[position]), position)
+    adjust_speed_to_duration(' '.join(sys.argv[3:]), './edited_bleeps', float(bw_end[position])-float(bw_start[position]), position)
 
 og_clip = VideoFileClip(sys.argv[1])
 final_clips = []

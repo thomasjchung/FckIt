@@ -1,6 +1,13 @@
-import { Box, Button, Typography, styled } from "@mui/material";
+import {
+  Box,
+  Button,
+  Chip,
+  Typography,
+  styled,
+  TextField,
+  CircularProgress,
+} from "@mui/material";
 import { useState } from "react";
-//import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 
 const VisuallyHiddenInput = styled("input")({
   clip: "rect(0 0 0 0)",
@@ -17,6 +24,30 @@ const VisuallyHiddenInput = styled("input")({
 export const DownloadView = () => {
   const [censorFile, setCensorFile] = useState<File | null>(null);
   const [bleepFile, setBleepFile] = useState<File | null>(null);
+
+  const [inputValue, setInputValue] = useState<string>("");
+  const [words, setWords] = useState<string[]>([]);
+
+  const [loading, setLoading] = useState<boolean>(false);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInputValue(e.target.value);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault(); // Prevent form submission
+      if (inputValue.trim() !== "") {
+        setWords([...words, inputValue.trim()]);
+        setInputValue("");
+      }
+    }
+  };
+
+  const handleDelete = (wordToDelete: string) => {
+    setWords(words.filter((word) => word !== wordToDelete));
+  };
 
   const handleCensorFileChange = (
     event: React.ChangeEvent<HTMLInputElement>
@@ -39,17 +70,26 @@ export const DownloadView = () => {
       formData.append("censorFile", censorFile);
       formData.append("bleepFile", bleepFile);
 
+      formData.append("words", JSON.stringify(words));
+
+      setLoading(true);
+      setVideoUrl(null);
+
       try {
         const response = await fetch("http://127.0.0.1:5000/process_video", {
           method: "POST",
           body: formData,
         });
-        console.log("Success!");
+        if (!response.ok) {
+          throw new Error("Failed");
+        }
         const data = await response.json();
-        console.log(data);
+        setVideoUrl(data.videoUrl);
         alert("Video processed successfully!");
       } catch (error) {
         console.error("Error");
+      } finally {
+        setLoading(false);
       }
     }
   };
@@ -77,7 +117,12 @@ export const DownloadView = () => {
           </Button>
         </Box>
         {censorFile && <Typography>{censorFile.name}</Typography>}
-        <Box display="flex" flexDirection="column" alignItems="center">
+        <Box
+          display="flex"
+          flexDirection="column"
+          alignItems="center"
+          padding={5}
+        >
           <Typography fontSize={25}>Clip to Bleep With</Typography>
 
           <Button
@@ -96,10 +141,64 @@ export const DownloadView = () => {
           </Button>
           {bleepFile && <Typography>{bleepFile.name}</Typography>}
         </Box>
+        <Box display="flex" flexDirection="column" alignItems="center">
+          <Typography fontSize={25}>
+            Input Words to Censor Here (default is Youtube TOS)
+          </Typography>
+          <TextField
+            label="Type a word and press Enter"
+            variant="outlined"
+            value={inputValue}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown} // Changed to onKeyDown
+            fullWidth
+            style={{ width: "300px" }}
+            InputProps={{
+              style: { padding: "1px 15px" },
+            }}
+            InputLabelProps={{
+              style: { fontSize: "16px" },
+            }}
+          />
+          <div style={{ marginTop: "10px" }}>
+            {words.map((word, index) => (
+              <span
+                key={index}
+                style={{
+                  margin: "5px",
+                  padding: "5px",
+                  backgroundColor: "#f0f0f0",
+                  borderRadius: "5px",
+                }}
+              >
+                <Chip
+                  key={index}
+                  label={word}
+                  onDelete={() => handleDelete(word)}
+                  style={{ cursor: "pointer" }}
+                />
+              </span>
+            ))}
+          </div>
+        </Box>
 
-        <Button type="submit" variant="contained" sx={{ mt: 2 }}>
+        <Button
+          type="submit"
+          variant="contained"
+          sx={{ mt: 2 }}
+          disabled={loading}
+        >
           Submit
         </Button>
+
+        {loading ? <CircularProgress size={24} /> : null}
+
+        {videoUrl && (
+          <Box mt={4}>
+            <Typography fontSize={20}>Processed Video:</Typography>
+            <video controls src={videoUrl} width="100%" />
+          </Box>
+        )}
       </Box>
     </form>
   );
